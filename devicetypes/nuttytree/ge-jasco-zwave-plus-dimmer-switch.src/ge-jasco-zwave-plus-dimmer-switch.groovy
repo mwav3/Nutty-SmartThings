@@ -17,7 +17,8 @@
  *
  *	Changelog:
  *
- *  0.18 (08/19/2020) - Updated to add compatibility to new Smarthings App and Smartlighting SmartApp - Various changes to timing parameters as well for proper device status
+ *  0.19 (08/29/2020) - Moved config settings to preferences to work with new app
+ *  0.18 (08/19/2020) - Updated to add compatibility to new Smart lighting app 
  *  0.17 (11/05/2018) - Add additional versions of the GE Z-Wave Plus Wall Dimmer
  *  0.16 (08/03/2017) - Fix bug with status not getting updated when turned on/off from SmartThings
  *  0.15 (04/28/2017) - Fix bug with setting level to 100%
@@ -40,7 +41,7 @@ import groovy.transform.Field
 import groovy.json.JsonOutput
 
 metadata {
-	definition (name: "GE/Jasco Z-Wave Plus Dimmer Switch", namespace: "nuttytree", author: "Chris Nussbaum") {
+	definition (name: "GE/Jasco Z-Wave Plus Dimmer inv test", namespace: "mwav3", author: "Chris Nussbaum") {
 		capability "Actuator"
 		capability "Button"
 		capability "Configuration"
@@ -105,7 +106,19 @@ metadata {
 	}
     
     preferences {
-        input (
+       
+       input "ledIndicator", "enum", title: "LED Indicator", description: "Turn LED indicator... ", required: false, options:["on": "When On", "off": "When Off", "never": "Never"], defaultValue: "off"
+        input "invertSwitch", "bool", title: "Invert Switch", description: "Invert switch? ", required: false
+		input "zwaveSteps", "number", title: "Z-Wave Dim Steps (1-99)", description: "Z-Wave Dim Steps ", required: false, range: "1..99"
+		input "zwaveDelay", "number", title: "Z-Wave Dim Delay (10ms Increments, 1-255)", description: "Z-Wave Dim Delay (10ms Increments) ", required: false, range: "1..255"
+		input "manualSteps", "number", title: "Manual Dim Steps (1-99)", description: "Manual Dim Steps ", required: false, range: "1..99"
+		input "manualDelay", "number", title: "Manual Dim Delay (10ms Increments, 1-255)", description: "Manual Dim Delay (10ms Increments) ", required: false, range: "1..255"
+		// No one uses these
+        // input "allonSteps", "number", title: "All-On/All-Off Dim Steps (1-99)", description: "All-On/All-Off Dim Steps ", required: false, range: "1..99"
+		// input "allonDelay", "number", title: "All-On/All-Off Dim Delay (10ms Increments, 1-255)", description: "All-On/All-Off Dim Delay (10ms Increments) ", required: false, range: "1..255"
+
+       
+       input (
             type: "paragraph",
             element: "paragraph",
             title: "Configure Association Groups:",
@@ -386,6 +399,12 @@ def updated() {
 
 	def nodes = []
     def cmds = []
+    
+     //lets make sure we are in the the right ranges
+    def zwaveSteps = Math.max(Math.min(zwaveSteps, 99), 1)
+    def zwaveDelay = Math.max(Math.min(zwaveDelay, 255), 1)
+    def manualSteps = Math.max(Math.min(manualSteps, 99), 1)
+    def manualDelay = Math.max(Math.min(manualDelay, 255), 1)
 
 	if (settings.requestedGroup2 != state.currentGroup2) {
         nodes = parseAssocGroupList(settings.requestedGroup2, 2)
@@ -402,33 +421,111 @@ def updated() {
         cmds << zwave.associationV2.associationGet(groupingIdentifier: 3)
         state.currentGroup3 = settings.requestedGroup3
     }
+  
+    switch (ledIndicator) {
+		case "on":
+			indicatorWhenOn()
+			break
+		case "off":
+			indicatorWhenOff()
+			break
+		case "never":
+			indicatorNever()
+			break
+		default:
+			indicatorWhenOn()
+			break
+	}
+    
+    switch (invertSwitch) {
+    	case "false":
+        	notInverted()
+            break
+        case "true":
+        	inverted()
+            break
+        default:
+        	notInverted()
+	}      
+    
+    // sendEvent(name: "zwaveSteps", value: zwaveSteps, displayed: false)	
+    // sendEvent(name: "zwaveDelay", value: zwaveDelay, displayed: false)	
+    // sendEvent(name: "manualSteps", value: manualSteps, displayed: false)
+    // sendEvent(name: "manualDelay", value: manualDelay, displayed: false)
+    
+    	sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV2.configurationSet(scaledConfigurationValue: zwaveSteps, parameterNumber: 7, size: 1).format()))
+ 		sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV2.configurationSet(scaledConfigurationValue: zwaveDelay, parameterNumber: 8, size: 2).format()))
+        sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV2.configurationSet(scaledConfigurationValue: manualSteps, parameterNumber: 9, size: 1).format()))
+        sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV2.configurationSet(scaledConfigurationValue: manualDelay, parameterNumber: 10, size: 2).format()))
+
+
+// def set(steps) {
+//	steps = Math.max(Math.min(steps, 99), 1)
+//	sendEvent(name: "zwaveSteps", value: steps, displayed: false)	
+//	zwave.configurationV2.configurationSet(scaledConfigurationValue: steps, parameterNumber: 7, size: 1).format()
+// }
+
+
+//    def setZwaveDelay(delay) 
+//	delay = Math.max(Math.min(delay, 255), 1)
+//	sendEvent(name: "zwaveDelay", value: delay, displayed: false)
+//	sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV2.configurationSet(scaledConfigurationValue: delay, parameterNumber: 8, size: 2).format()))
+
+
+// def setManualSteps(steps) 
+//	steps = Math.max(Math.min(steps, 99), 1)
+//	sendEvent(name: "manualSteps", value: steps, displayed: false)	
+//	zwave.configurationV2.configurationSet(scaledConfigurationValue: steps, parameterNumber: 9, size: 1).format()
+
+
+// def setManualDelay(delay) 
+//	delay = Math.max(Math.min(delay, 255), 1)
+//	sendEvent(name: "manualDelay", value: delay, displayed: false)
+//	zwave.configurationV2.configurationSet(scaledConfigurationValue: delay, parameterNumber: 10, size: 2).format()
+
+    
+//	cmds << zwave.configurationV2.configurationSet(scaledConfigurationValue: ["zwaveSteps"], parameterNumber: 7, size: 1).format()
+//
+//	cmds << zwave.configurationV2.configurationSet(scaledConfigurationValue: ["zwaveDelay"], parameterNumber: 8, size: 2).format()
+
+//	cmds << zwave.configurationV2.configurationSet(scaledConfigurationValue: ["manualSteps"], parameterNumber: 9, size: 1).format()
+
+//	cmds << zwave.configurationV2.configurationSet(scaledConfigurationValue: ["manualDelay"], parameterNumber: 10, size: 2).format()
 
 	sendHubCommand(cmds.collect{ new physicalgraph.device.HubAction(it.format()) }, 500)
+
 }
 
-def indicatorWhenOn() {
-	sendEvent(name: "indicatorStatus", value: "when on", display: false)
-	zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: 3, size: 1).format()
+def zwaveEvent(physicalgraph.zwave.commands.configurationv1.ConfigurationReport cmd) {
+	def value = "when off"
+	if (cmd.configurationValue[0] == 1) {value = "when on"}
+	if (cmd.configurationValue[0] == 2) {value = "never"}
+	[name: "indicatorStatus", value: value, displayed: false]
 }
 
-def indicatorWhenOff() {
-	sendEvent(name: "indicatorStatus", value: "when off", display: false)
-	zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: 3, size: 1).format()
+void indicatorWhenOn() {
+	sendEvent(name: "indicatorStatus", value: "when on", displayed: false)
+	sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV1.configurationSet(configurationValue: [1], parameterNumber: 3, size: 1).format()))
 }
 
-def indicatorNever() {
-	sendEvent(name: "indicatorStatus", value: "never", display: false)
-	zwave.configurationV2.configurationSet(configurationValue: [2], parameterNumber: 3, size: 1).format()
+void indicatorWhenOff() {
+	sendEvent(name: "indicatorStatus", value: "when off", displayed: false)
+	sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV1.configurationSet(configurationValue: [0], parameterNumber: 3, size: 1).format()))
 }
 
-def inverted() {
+void indicatorNever() {
+	sendEvent(name: "indicatorStatus", value: "never", displayed: false)
+	sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV1.configurationSet(configurationValue: [2], parameterNumber: 3, size: 1).format()))
+}
+
+void inverted() {
 	sendEvent(name: "inverted", value: "inverted", display: false)
-	zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: 4, size: 1).format()
-}
+    sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: 4, size: 1).format()))
+	}
 
-def notInverted() {
+void notInverted() {
 	sendEvent(name: "inverted", value: "not inverted", display: false)
-	zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: 4, size: 1).format()
+    sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: 4, size: 1).format()))
 }
 
 def doubleUp() {
@@ -439,7 +536,7 @@ def doubleDown() {
 	sendEvent(name: "button", value: "pushed", data: [buttonNumber: 2], descriptionText: "Double-tap down (button 2) on $device.displayName", isStateChange: true, type: "digital")
 }
 
-def setZwaveSteps(steps) {
+def set(steps) {
 	steps = Math.max(Math.min(steps, 99), 1)
 	sendEvent(name: "zwaveSteps", value: steps, displayed: false)	
 	zwave.configurationV2.configurationSet(scaledConfigurationValue: steps, parameterNumber: 7, size: 1).format()
