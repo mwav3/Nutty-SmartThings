@@ -41,7 +41,7 @@ import groovy.transform.Field
 import groovy.json.JsonOutput
 
 metadata {
-	definition (name: "GE/Jasco Z-Wave Plus Dimmer inv test", namespace: "mwav3", author: "Chris Nussbaum") {
+	definition (name: "GE/Jasco Z-Wave Plus Dimmer time test2", namespace: "mwav3", author: "Chris Nussbaum") {
 		capability "Actuator"
 		capability "Button"
 		capability "Configuration"
@@ -405,7 +405,9 @@ def updated() {
     def zwaveDelay = Math.max(Math.min(zwaveDelay, 255), 1)
     def manualSteps = Math.max(Math.min(manualSteps, 99), 1)
     def manualDelay = Math.max(Math.min(manualDelay, 255), 1)
-
+    
+   
+    
 	if (settings.requestedGroup2 != state.currentGroup2) {
         nodes = parseAssocGroupList(settings.requestedGroup2, 2)
         cmds << zwave.associationV2.associationRemove(groupingIdentifier: 2, nodeId: [])
@@ -448,16 +450,17 @@ def updated() {
         	notInverted()
 	}      
     
-    // sendEvent(name: "zwaveSteps", value: zwaveSteps, displayed: false)	
-    // sendEvent(name: "zwaveDelay", value: zwaveDelay, displayed: false)	
-    // sendEvent(name: "manualSteps", value: manualSteps, displayed: false)
-    // sendEvent(name: "manualDelay", value: manualDelay, displayed: false)
+   
     
     	sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV2.configurationSet(scaledConfigurationValue: zwaveSteps, parameterNumber: 7, size: 1).format()))
  		sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV2.configurationSet(scaledConfigurationValue: zwaveDelay, parameterNumber: 8, size: 2).format()))
         sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV2.configurationSet(scaledConfigurationValue: manualSteps, parameterNumber: 9, size: 1).format()))
         sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV2.configurationSet(scaledConfigurationValue: manualDelay, parameterNumber: 10, size: 2).format()))
 
+        sendEvent(name: "zwaveSteps", value: zwaveSteps, displayed: false)	
+        sendEvent(name: "zwaveDelay", value: zwaveDelay, displayed: false)	
+        sendEvent(name: "manualSteps", value: manualSteps, displayed: false)
+        sendEvent(name: "manualDelay", value: manualDelay, displayed: false)
 
 // def set(steps) {
 //	steps = Math.max(Math.min(steps, 99), 1)
@@ -607,7 +610,9 @@ def on() {
 	def cmds = []
     cmds << zwave.basicV1.basicSet(value: 0xFF).format()
    	cmds << zwave.switchMultilevelV2.switchMultilevelGet().format()
-    def delay = ((device.currentValue("zwaveSteps") * device.currentValue("zwaveDelay")).longValue() * 1000) + 500
+    // broken delay calculation
+    // def delay = ((device.currentValue("zwaveSteps") * device.currentValue("zwaveDelay")).longValue() * 1000) + 500
+    def delay = ((((100-(device.currentValue("zwaveSteps"))) * (10*(device.currentValue("zwaveDelay")))).longValue()) + 500)
     delayBetween(cmds, delay)
 }
 
@@ -615,7 +620,9 @@ def off() {
 	def cmds = []
     cmds << zwave.basicV1.basicSet(value: 0x00).format()
    	cmds << zwave.switchMultilevelV2.switchMultilevelGet().format()
-    def delay = ((device.currentValue("zwaveSteps") * device.currentValue("zwaveDelay")).longValue() * 1000) + 500
+   // broken delay calculation
+    // def delay = ((device.currentValue("zwaveSteps") * device.currentValue("zwaveDelay")).longValue() * 1000) + 500
+    def delay = ((((100-(device.currentValue("zwaveSteps"))) * (10*(device.currentValue("zwaveDelay")))).longValue()) + 500)
     delayBetween(cmds, delay)
 }
 
@@ -628,7 +635,9 @@ def setLevel(value) {
 		sendEvent(name: "switch", value: "off")
 	}
 	sendEvent(name: "level", value: level, unit: "%")
-    def delay = (device.currentValue("zwaveSteps") * device.currentValue("zwaveDelay") * level / 100).longValue() + 1000
+    // broken delay calculation
+    // def delay = (device.currentValue("zwaveSteps") * device.currentValue("zwaveDelay") * level / 100).longValue() + 1000
+    def delay = ((((100-(device.currentValue("zwaveSteps"))) * (10*(device.currentValue("zwaveDelay"))) * level / 100).longValue()) + 500)
 	delayBetween ([
     	zwave.basicV1.basicSet(value: level).format(),
         zwave.switchMultilevelV1.switchMultilevelGet().format()
