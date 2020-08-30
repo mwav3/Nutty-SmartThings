@@ -109,10 +109,10 @@ metadata {
        
        input "ledIndicator", "enum", title: "LED Indicator", description: "Turn LED indicator... ", required: false, options:["on": "When On", "off": "When Off", "never": "Never"], defaultValue: "off"
         input "invertSwitch", "bool", title: "Invert Switch", description: "Invert switch? ", required: false
-		input "zwaveSteps", "number", title: "Z-Wave Dim Steps (1-99)", description: "Z-Wave Dim Steps ", required: false, range: "1..99"
-		input "zwaveDelay", "number", title: "Z-Wave Dim Delay (10ms Increments, 3-255)", description: "Z-Wave Dim Delay (10ms Increments) ", required: false, range: "3..255"
-		input "manualSteps", "number", title: "Manual Dim Steps (1-99)", description: "Manual Dim Steps ", required: false, range: "1..99"
-		input "manualDelay", "number", title: "Manual Dim Delay (10ms Increments, 1-255)", description: "Manual Dim Delay (10ms Increments) ", required: false, range: "1..255"
+		input "zwaveSteps", "number", title: "Z-Wave Dim Steps (1-99) Default 1", description: "Z-Wave Dim Steps ", required: false, range: "1..99"
+		input "zwaveDelay", "number", title: "Z-Wave Dim Delay (10ms Increments, 3-255) Default 3", description: "Z-Wave Dim Delay (10ms Increments) ", required: false, range: "3..255"
+		input "manualSteps", "number", title: "Manual Dim Steps (1-99) Default 1", description: "Manual Dim Steps ", required: false, range: "1..99"
+		input "manualDelay", "number", title: "Manual Dim Delay (10ms Increments, 1-255) Default 3", description: "Manual Dim Delay (10ms Increments) ", required: false, range: "1..255"
 		// No one uses these
         // input "allonSteps", "number", title: "All-On/All-Off Dim Steps (1-99)", description: "All-On/All-Off Dim Steps ", required: false, range: "1..99"
 		// input "allonDelay", "number", title: "All-On/All-Off Dim Delay (10ms Increments, 1-255)", description: "All-On/All-Off Dim Delay (10ms Increments) ", required: false, range: "1..255"
@@ -400,14 +400,39 @@ def updated() {
 	def nodes = []
     def cmds = []
     
-     //lets make sure we are in the the right ranges
+    if (settings.zwaveSteps != null) {
+    
     def zwaveSteps = Math.max(Math.min(zwaveSteps, 99), 1)
+   	sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV2.configurationSet(scaledConfigurationValue: zwaveSteps, parameterNumber: 7, size: 1).format()))
+    sendEvent(name: "zwaveSteps", value: zwaveSteps, displayed: false)
+    
+    }
+    
+    if (settings.zwaveDelay != null) {
+    
     def zwaveDelay = Math.max(Math.min(zwaveDelay, 255), 3)
+    sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV2.configurationSet(scaledConfigurationValue: zwaveDelay, parameterNumber: 8, size: 2).format()))
+    sendEvent(name: "zwaveDelay", value: zwaveDelay, displayed: false)
+    
+    }
+    
+    if (settings.manualSteps != null) {
+    
     def manualSteps = Math.max(Math.min(manualSteps, 99), 1)
+    sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV2.configurationSet(scaledConfigurationValue: manualSteps, parameterNumber: 9, size: 1).format()))
+    sendEvent(name: "manualSteps", value: manualSteps, displayed: false)
+    
+    }
+    
+    if (settings.manualDelay != null) {
+    
     def manualDelay = Math.max(Math.min(manualDelay, 255), 1)
+    sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV2.configurationSet(scaledConfigurationValue: manualDelay, parameterNumber: 10, size: 2).format()))
+    sendEvent(name: "manualDelay", value: manualDelay, displayed: false)
     
-   
+    }
     
+         
 	if (settings.requestedGroup2 != state.currentGroup2) {
         nodes = parseAssocGroupList(settings.requestedGroup2, 2)
         cmds << zwave.associationV2.associationRemove(groupingIdentifier: 2, nodeId: [])
@@ -435,7 +460,7 @@ def updated() {
 			indicatorNever()
 			break
 		default:
-			indicatorWhenOn()
+			indicatorWhenOff()
 			break
 	}
     
@@ -450,18 +475,6 @@ def updated() {
         	notInverted()
 	}      
  
-
-    
-    	sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV2.configurationSet(scaledConfigurationValue: zwaveSteps, parameterNumber: 7, size: 1).format()))
- 		sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV2.configurationSet(scaledConfigurationValue: zwaveDelay, parameterNumber: 8, size: 2).format()))
-        sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV2.configurationSet(scaledConfigurationValue: manualSteps, parameterNumber: 9, size: 1).format()))
-        sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV2.configurationSet(scaledConfigurationValue: manualDelay, parameterNumber: 10, size: 2).format()))
-
-        sendEvent(name: "zwaveSteps", value: zwaveSteps, displayed: false)	
-        sendEvent(name: "zwaveDelay", value: zwaveDelay, displayed: false)	
-        sendEvent(name: "manualSteps", value: manualSteps, displayed: false)
-        sendEvent(name: "manualDelay", value: manualDelay, displayed: false)
-
 	sendHubCommand(cmds.collect{ new physicalgraph.device.HubAction(it.format()) }, 500)
 
 }
